@@ -1,0 +1,36 @@
+---
+- hosts: all
+  sudo: yes
+
+  vars:
+    gnatsd_url: https://github.com/nats-io/gnatsd/releases/download/v0.7.2/gnatsd-v0.7.2-linux-amd64.tar.gz
+
+  tasks:
+  - name: Test to see if GNATSd tarball already download
+    command: /usr/bin/test -e /tmp/gnatsd.tar.gz
+    register: gnatsd_download
+    ignore_errors: True
+
+  - name: Download the GNATSd tarball
+    get_url: url={{ gnatsd_url }} dest=/tmp/gnatsd.tar.gz mode=0440
+    when: gnatsd_download.rc != 0
+
+  - name: Test to see if GNATSd is installed
+    command: /usr/bin/test -e /opt/gnatsd/gnatsd
+    register: gnatsd_installed
+    changed_when: False
+    ignore_errors: True
+
+  - name: Create GNATSd runtime dir
+    command: chdir=/opt/ /bin/mkdir -p gnatsd
+    when: gnatsd_installed.rc != 0
+
+  - name: Extract GNATSd tarball
+    command: chdir=/tmp/ /bin/tar xvzf gnatsd.tar.gz -C /opt/gnatsd/
+    when: gnatsd_installed.rc != 0
+
+  - name: Copy over the init script
+    copy: src=files/gnatsd.conf dest=/etc/init/gnatsd.conf mode=0644
+
+  - name: restart gnatsd
+    service: name=gnatsd state=restarted
